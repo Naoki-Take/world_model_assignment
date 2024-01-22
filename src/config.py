@@ -14,6 +14,9 @@ state_history_len = 1
 state_shape = (state_history_len*2+1, 8, 8)
 
 # network
-action_space_size = 60
+action_space_size = 65
 num_channels = 128
 num_hidden = 8
+
+# replaybuffer
+window_size = 512

@@ -2,7 +2,7 @@ import config
 from game import *
 from network import *
 from replaybuffer import *
-
+from mcts import *
 import torch
 import time
 import ray
@@ -34,19 +34,26 @@ def run_selfplay(network, replaybuffer):
         replaybuffer.save_game(ray.get(finished)[0])
         work_in_progresses.extend([selfplay.remote(network)])
         print(f'{int(i*100/config.num_selfplay)}% done')#!
+    print(f'buffer_length:{replaybuffer.get_len()}')
     print(f'Elapsed(run_selfplay):{time.time() - start}')
 
 @ray.remote
 def selfplay(network):
     game = Game()
-    while not game.is_terminated and len(game.history['action']) < config.max_moves:
-        root = Node(0, game.to_play())
+    while not game.is_terminated() and len(game.history['action']) < config.max_moves:
+        root = Node()
         current_observation = game.get_encoded_state(game.environment.steps)
         current_observation = torch.from_numpy(current_observation)
         with torch.no_grad():
-            # print(current_observation.size())
             net_output = network.initial_inference(current_observation) #! on cpu
-        game.is_terminated=True #!
+        root.expand_node(game.legal_actions(), net_output)#!#!#!#!#!##!#!#!#!#!#!#!
+        
+        action_idx = MCTS(root, network)
+        game.apply(Action(action_idx, game.to_play()))
+        break #!
+    
+    time.sleep(1)
+    
     return game
 
 def train_network():
