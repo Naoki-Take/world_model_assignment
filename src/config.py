@@ -20,3 +20,11 @@ num_hidden = 8
 
 # replaybuffer
 window_size = 512
+
+# MCTS
+num_simulations = 300
+discount = 1
+
+# UCB formula
+pb_c_base = 19652
+pb_c_init = 1.25

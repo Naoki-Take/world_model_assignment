@@ -47,6 +47,31 @@ class Representation(nn.Module):
         return h
 
 
+class Dynamics(nn.Module):
+    '''Hidden state transition'''
+    def __init__(self, num_channels=config.num_channels):
+        super().__init__()
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(config.num_hidden + 2, num_channels, 3, 1, 1, bias=False),
+            # nn.BatchNorm2d(128),
+            nn.ReLU(),
+            ResidualBlock(num_channels),
+            ResidualBlock(num_channels),
+            ResidualBlock(num_channels),
+            nn.Conv2d(num_channels, config.num_hidden, 3, 1, 1, bias=False),
+            # nn.BatchNorm2d(2),
+            nn.ReLU(),
+
+        )
+
+    def forward(self, rp, a):
+        h = torch.cat((rp, a), dim=1)
+        h = self.conv(h)
+
+        return h
+
+
 class Prediction(nn.Module):
     def __init__(self):
         super().__init__()
@@ -77,12 +102,15 @@ class Prediction(nn.Module):
         
         return value, policy
 
+
 class Network(nn.Module):
+
     def __init__(self):
         super().__init__()
 
         self.representation = Representation()
         self.prediction = Prediction()
+        self.dynamics = Dynamics()
     
     def initial_inference(self, encoded_state):
         if encoded_state.ndim == 3:
@@ -91,16 +119,32 @@ class Network(nn.Module):
         value, policy = self.prediction(hidden)
         return value, policy, hidden
 
+    def recurrent_inference(self, hidden_state, encoded_action):
+        if hidden_state.ndim == 3:
+            hidden_state = hidden_state.unsqueeze(0)
+        if encoded_action.ndim == 3:
+            encoded_action = encoded_action.unsqueeze(0)
+        # dynamics + prediction function
+        hidden = self.dynamics(hidden_state, encoded_action)
+        value, policy = self.prediction(hidden)
+        return value, policy, hidden
+
     def forward(self):
         pass
+
+
 def test():
     encoded_state = torch.randn(config.state_shape)
-    action = torch.randn((1, 2, 8, 8))
+    encoded_action = torch.randn((1, 2, 8, 8))
 
     network = Network()
-
-    value, policy, hidden = network.initial_inference(encoded_state)
+    with torch.no_grad():
+        value, policy, hidden = network.initial_inference(encoded_state)
     print(f'value_ini:{value.shape}|policy_ini:{policy.shape}|hidden_ini:{hidden.shape}')
+
+    with torch.no_grad():
+        value, policy, hidden = network.recurrent_inference(hidden, encoded_action)
+    print(f'value_rec:{value}|policy_rec:{policy.shape}|hidden_rec:{hidden.shape}')
 
 if __name__ == "__main__":
     test()

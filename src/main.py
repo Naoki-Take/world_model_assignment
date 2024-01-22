@@ -24,7 +24,6 @@ def MuZero():
     print('COMPLATED')
         
 
-
 def run_selfplay(network, replaybuffer):
     start = time.time()
     work_in_progresses = [selfplay.remote(network) for i in range(15)]
@@ -41,16 +40,16 @@ def run_selfplay(network, replaybuffer):
 def selfplay(network):
     game = Game()
     while not game.is_terminated() and len(game.history['action']) < config.max_moves:
-        root = Node()
+        root = Node(prior=0)
         current_observation = game.get_encoded_state(game.environment.steps)
         current_observation = torch.from_numpy(current_observation)
         with torch.no_grad():
             net_output = network.initial_inference(current_observation) #! on cpu
         root.expand_node(game.legal_actions(), net_output)#!#!#!#!#!##!#!#!#!#!#!#!
         
-        action_idx = MCTS(root, network)
-        game.apply(Action(action_idx, game.to_play()))
-        break #!
+        action = MCTS(root, game, network)
+        game.apply(Action(action, game.to_play()))
+
     
     time.sleep(1)
     

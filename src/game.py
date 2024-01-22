@@ -1,12 +1,20 @@
+import config
+
 from enum import Enum
 from typing import List, Tuple, Optional
 from dataclasses import dataclass, field
+
 import numpy as np
-import config
+import math
+
 
 class Player(Enum):
     BLACK = 1
     WHITE = -1
+
+def get_opponent_player(player):
+    player = Player.WHITE if player is Player.BLACK else Player.BLACK
+    return player
 
 @dataclass
 class Action:
@@ -21,11 +29,11 @@ class Action:
         else:
             self.position = None
     
-    # def encode(self):
-    #     encoded_action = np.zeros((2, 8, 8), dtype=np.bool)
-    #     layer = 0 if self.player is Player.BLACK else 1
-    #     encoded_action[layer, self.position] = 1
-    #     return encoded_action
+    def get_encoded_action(self):
+        encoded_action = np.zeros((2, config.board_length, config.board_length), dtype=np.bool)
+        layer = 0 if self.player is Player.BLACK else 1
+        encoded_action[layer, self.position] = 1
+        return encoded_action
 
 
 DIRECTIONS = (np.array([-1, -1]), np.array([-1, 0]), np.array([-1, 1]), np.array([0, -1]),
@@ -117,7 +125,7 @@ class Environment:
 
         position = np.array(action.position)
 
-        opponent_player = Player.WHITE if self.player is Player.BLACK else Player.BLACK
+        opponent_player = get_opponent_player(self.player)
 
         # flip the pieces
         for direction in DIRECTIONS:
@@ -179,7 +187,7 @@ class Environment:
     
     def observe(self):
 
-        obs = np.stack((self.board==Player.WHITE.value, self.board==Player.BLACK.value), axis=0).astype(np.bool)
+        obs = np.stack((self.board==Player.WHITE.value, self.board==Player.BLACK.value), axis=0).astype(bool)
 
         return obs
     
@@ -202,13 +210,57 @@ def index_to_char(index):
 
 
 class Node:
-    def __init__(self):
+    def __init__(self, prior, parent = None):
+        self.hidden_state = None
+        self.reward = 0
+
+        self.prior = prior
+        self.value_sum = 0
+        self.visit_count = 0
+
+        self.parent = parent
         self.children = {}
+
+    def is_expanded(self):
+
+        return len(self.children) > 0
     
+    def value(self):
+
+        if self.visit_count == 0:
+            return 0
+        
+        return self.value_sum / self.visit_count
+
     def expand_node(self, actions, network_output):
+        self.hidden_state = network_output[2].squeeze()
         policy = {a.index: network_output[1][0, a.index].item() for a in actions}
         for action, p in policy.items():
-            self.children[action] = Node()
+            self.children[action] = Node(prior=p, parent=self)
+    
+    def select_child(self):
+
+        _, action, child = max((self.ucb_score(child), action, child) for action, child in self.children.items())
+        return action, child
+    
+    def ucb_score(self, child):
+
+        pb_c = math.log((self.visit_count + config.pb_c_base + 1) / config.pb_c_base) + config.pb_c_init
+        pb_c *= math.sqrt(self.visit_count) / (child.visit_count + 1)
+
+        prior_score = pb_c * child.prior
+        
+        return child.value() + prior_score
+    
+    def backpropagate(self, value: float):
+
+        self.value_sum += value
+        self.visit_count += 1
+
+        value = self.reward + config.discount * (-value)
+        if self.parent is not None:
+            self.parent.backpropagate(value)
+
 
 
 class Game:
