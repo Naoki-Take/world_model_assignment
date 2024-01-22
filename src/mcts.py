@@ -45,3 +45,100 @@ def softmax_sample(distribution, temperature: float):
     else:
         raise NotImplementedError
 
+
+def test_PvC():
+
+    network = Network()
+
+    print('black or white?')
+    
+    while True:
+        color =  int(input('1.black 2.white'))
+        if color in (1, 2):
+            break
+        else:
+            print('input 1 or 2.')
+
+    game = Game()
+    game.environment.print_board()
+
+    if color == 1:
+        while True:
+            legal_actions = game.legal_actions()
+            for i, action in enumerate(legal_actions):
+                print(f'{i}:{action.position}', end="")
+            print('')
+            is_invalid_action = True
+            while is_invalid_action:
+                action_idx = int(input("Your Turn:"))
+                if action_idx in range(len(legal_actions)):
+                    is_invalid_action = False
+                else:
+                    print(f'{action_idx} is invalid action')
+            
+            game.apply(legal_actions[action_idx])
+            game.environment.print_board()
+
+            if game.is_terminated():
+                game.environment.check_win2()
+                break
+            
+            root = Node(prior=0)
+            current_observation = game.get_encoded_state(game.environment.steps)
+            current_observation = torch.from_numpy(current_observation)
+            with torch.no_grad():
+                net_output = network.initial_inference(current_observation) #! on cpu
+            root.expand_node(game.legal_actions(), net_output)
+            
+            action = MCTS(root, game, network)
+
+            game.apply(Action(action, game.to_play()))
+
+            print(f'Cpu:{Action(action, game.to_play()).position}')
+            game.environment.print_board()
+
+            if game.is_terminated():
+                game.environment.check_win2()
+                break
+    
+    else:
+        while True:
+            
+            root = Node(prior=0)
+            current_observation = game.get_encoded_state(game.environment.steps)
+            current_observation = torch.from_numpy(current_observation)
+            with torch.no_grad():
+                net_output = network.initial_inference(current_observation) #! on cpu
+            root.expand_node(game.legal_actions(), net_output)
+            
+            action = MCTS(root, game, network)
+
+            game.apply(Action(action, game.to_play()))
+            print(f'Cpu:{Action(action, game.to_play()).position}')
+            game.environment.print_board()
+
+            if game.is_terminated():
+                game.environment.check_win2()
+                break
+            
+            legal_actions = game.legal_actions()
+            for i, action in enumerate(legal_actions):
+                print(f'{i}:{action.position}', end="")
+            print('')
+            is_invalid_action = True
+            while is_invalid_action:
+                action_idx = int(input("Your Turn:"))
+                if action_idx in range(len(legal_actions)):
+                    is_invalid_action = False
+                else:
+                    print(f'{action_idx} is invalid action')
+            
+            game.apply(legal_actions[action_idx])
+            game.environment.print_board()
+
+            if game.is_terminated():
+                game.environment.check_win2()
+                break
+
+if __name__ == '__main__':
+    test_PvC()

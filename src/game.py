@@ -298,7 +298,7 @@ class Game:
 
         return self.environment.player
 
-def test_game():
+def test_PvP():
     # PvP
     game = Game()
     game.environment.print_board()
@@ -322,8 +322,9 @@ def test_game():
             game.environment.check_win2()
             break
 
+
 def test_Node():
     pass
 
 if __name__ == '__main__':
-    test_game()
+    test_PvP()

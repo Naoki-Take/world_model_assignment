@@ -45,7 +45,7 @@ def selfplay(network):
         current_observation = torch.from_numpy(current_observation)
         with torch.no_grad():
             net_output = network.initial_inference(current_observation) #! on cpu
-        root.expand_node(game.legal_actions(), net_output)#!#!#!#!#!##!#!#!#!#!#!#!
+        root.expand_node(game.legal_actions(), net_output)
         
         action = MCTS(root, game, network)
         game.apply(Action(action, game.to_play()))
