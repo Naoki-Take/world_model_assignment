@@ -134,8 +134,8 @@ class Network(nn.Module):
 
 
 def test():
-    encoded_state = torch.randn(config.state_shape)
-    encoded_action = torch.randn((1, 2, 8, 8))
+    encoded_state = torch.randn(10, 3, 8, 8)
+    encoded_action = torch.randn((10, 2, 8, 8))
 
     network = Network()
     with torch.no_grad():

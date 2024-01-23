@@ -30,7 +30,7 @@ class Action:
             self.position = None
     
     def get_encoded_action(self):
-        encoded_action = np.zeros((2, config.board_length, config.board_length), dtype=np.bool)
+        encoded_action = np.zeros((2, config.board_length, config.board_length), dtype=np.uint8)
         layer = 0 if self.player is Player.BLACK else 1
         encoded_action[layer, self.position] = 1
         return encoded_action
@@ -184,10 +184,10 @@ class Environment:
         else:
             print('WHITE_WIN')
             return None
-    
+
     def observe(self):
 
-        obs = np.stack((self.board==Player.WHITE.value, self.board==Player.BLACK.value), axis=0).astype(bool)
+        obs = np.stack((self.board==Player.WHITE.value, self.board==Player.BLACK.value), axis=0).astype(np.uint8)
 
         return obs
     
@@ -267,11 +267,11 @@ class Game:
     def __init__(self):
 
         self.environment = Environment()
-        self.history = {'action':[], 'state':[self.environment.observe()], 'reward':[]}
+        self.history = {'action':[], 'state':[self.environment.observe()], 'hidden_state':[], 'reward':[], 'node_value':[], 'childlen_visits':[]}
     
     def get_encoded_state(self, state_idx):
 
-        encoded_state = np.zeros(config.state_shape, dtype=bool) #! why bool
+        encoded_state = np.zeros(config.state_shape, dtype=np.uint8) #! why bool
         for i in range(min(state_idx+1, config.state_history_len)):
             encoded_state[(config.state_history_len-1-i)*2:(config.state_history_len-i)*2] = self.history['state'][state_idx-i]
         if state_idx % 2 == 1:
@@ -290,6 +290,34 @@ class Game:
         self.history['state'].append(state)
         self.history['action'].append(action)
         self.history['reward'].append(reward)
+    
+    def store_search_statistics(self, node):
+        self.history['hidden_state'].append(node.hidden_state)
+        self.history['node_value'].append(node.value())
+
+        sum_visits = sum(child.visit_count for child in node.children.values())
+        action_space = (index for index in range(config.action_space_size))
+        self.history['childlen_visits'].append([node.children[a].visit_count / node.visit_count if a in node.children.keys() else 0 for a in action_space])
+        
+    
+    def get_target(self, state_idx):
+        
+        #target_value = []
+        #target_policy = []
+
+        for current_idx in range(state_idx, state_idx + config.num_unroll_steps):
+
+            if current_idx < len(self.history['node_value']):
+                value = self.history['reward'][-1] if self.history['action'][current_idx].player is self.history['reward'][-1] else -self.history['reward'][-1]
+                # targets.append((value, self.child_visits[current_index]))
+                target_value = value
+                target_policy = self.history['childlen_visits'][current_idx]
+            else:
+                # targets.append((0, [ 0 for _ in range(config.action_space_size)]))
+                target_value = 0
+                target_policy = [ 0 for _ in range(config.action_space_size)]
+
+        return target_value, target_policy
 
     def is_terminated(self):
         return self.environment.done
