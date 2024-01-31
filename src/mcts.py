@@ -2,6 +2,7 @@ import config
 from network import *
 from game import *
 
+
 def MCTS(root, game, network):
     player = game.to_play()
     for _ in range(config.num_simulations):

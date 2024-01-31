@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class ResidualBlock(nn.Module):
     def __init__(self, filters):
         super().__init__()
